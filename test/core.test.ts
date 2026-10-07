@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeBaseUrl, websocketUrl, requestBody, SearchInput, search } from '../src/core.js';
+import extension, { WEB_SEARCH_INSTRUCTIONS } from '../src/extension.js';
 
 describe('request construction', () => {
  it('normalizes endpoint and preserves hosted search contract', () => { expect(normalizeBaseUrl('http://proxy.local/')).toBe('http://proxy.local'); expect(websocketUrl('https://proxy.local/')).toBe('wss://proxy.local/v1/responses'); const b=requestBody({query:'cats',search_context_size:'high'},{baseUrl:'https://proxy.local',apiKey:'x',model:'gpt',reasoningEffort:'high'}); expect(b.reasoning).toEqual({effort:'high'}); expect(b.store).toBe(false); expect(b.tools).toEqual([{type:'web_search',search_context_size:'high'}]); });
@@ -8,3 +9,17 @@ describe('request construction', () => {
 });
 
 describe('local_time', () => { it('returns readable local time and structured timestamp', async () => { const { localTime } = await import('../src/core.js'); const result = localTime(new Date('2026-10-07T20:00:00.000Z')); expect(result.details.iso).toBe('2026-10-07T20:00:00.000Z'); expect(result.details.epochMs).toBe( Date.parse('2026-10-07T20:00:00.000Z') ); expect(result.text).toMatch(/2026/); }); });
+
+describe('system prompt guidance', () => {
+ it('adds web search instructions only when the tool is selected', () => {
+  let beforeAgentStart: any;
+  const pi: any = { on: (name: string, handler: any) => { if (name === 'before_agent_start') beforeAgentStart = handler; }, registerTool: () => {} };
+  extension(pi);
+  const withTool = { systemPromptOptions: { selectedTools: ['web_search'], sections: {} as Record<string, string> } };
+  beforeAgentStart(withTool);
+  expect(withTool.systemPromptOptions.sections.web_search_guidance).toBe(WEB_SEARCH_INSTRUCTIONS);
+  const withoutTool = { systemPromptOptions: { selectedTools: [], sections: { web_search_guidance: 'stale' } } };
+  beforeAgentStart(withoutTool);
+  expect(withoutTool.systemPromptOptions.sections.web_search_guidance).toBeUndefined();
+ });
+});
