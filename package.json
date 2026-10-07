@@ -1,0 +1,32 @@
+{
+  "name": "pi-cliproxyapi-web-search",
+  "version": "0.1.0",
+  "description": "Pi web_search tool backed by CLIProxyAPI Codex Responses WebSocket",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "pi"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
+    "@sinclair/typebox": "^0.34.33"
+  }
+}
