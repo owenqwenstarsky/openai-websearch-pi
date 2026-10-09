@@ -1,7 +1,7 @@
 {
   "name": "pi-cliproxyapi-web-search",
   "version": "0.1.0",
-  "description": "Pi web_search tool backed by CLIProxyAPI Codex Responses WebSocket",
+  "description": "Pi hosted web_search tool for OpenAI API, signed-in ChatGPT, and CLIProxyAPI",
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",

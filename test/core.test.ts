@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { normalizeBaseUrl, websocketUrl, requestBody, SearchInput, search, parseEvent } from '../src/core.js';
 import extension, { WEB_SEARCH_INSTRUCTIONS } from '../src/extension.js';
 
@@ -30,5 +30,34 @@ describe('system prompt guidance', () => {
   const withoutTool = { systemPromptOptions: { selectedTools: [], sections: { web_search_guidance: 'stale' } } };
   beforeAgentStart(withoutTool);
   expect(withoutTool.systemPromptOptions.sections.web_search_guidance).toBeUndefined();
+ });
+});
+
+
+describe('CPA lifecycle regressions', () => {
+ it('rejects pre-aborted requests before opening a socket', async () => {
+  const controller = new AbortController(); controller.abort();
+  const factory = vi.fn();
+  await expect(search({ query: 'news', search_context_size: 'low' }, { baseUrl: 'https://proxy.test', apiKey: 'proxy-secret', model: 'proxy-model', websocketFactory: factory }, controller.signal)).rejects.toThrow('cancelled');
+  expect(factory).not.toHaveBeenCalled();
+ });
+ it.each(['timeout', 'close', 'malformed', 'failed', 'incomplete'])('fails clearly and cleans up on %s', async kind => {
+  const listeners = new Map<string, (event: any) => void>();
+  const close = vi.fn();
+  const remove = vi.fn((type: string) => { listeners.delete(type); });
+  const controller = new AbortController();
+  const removeAbort = vi.spyOn(controller.signal, 'removeEventListener');
+  const promise = search({ query: 'news', search_context_size: 'medium' }, {
+   baseUrl: 'https://proxy.test', apiKey: 'proxy-secret', model: 'proxy-model', timeoutMs: 10,
+   websocketFactory: () => ({ send() {}, close, addEventListener: (type, listener) => { listeners.set(type, listener); }, removeEventListener: remove }),
+  }, controller.signal);
+  if (kind === 'close') listeners.get('close')!({});
+  if (kind === 'malformed') listeners.get('message')!({ data: 'not-json' });
+  if (kind === 'failed') listeners.get('message')!({ data: JSON.stringify({ type: 'response.failed', response: { error: { message: 'bad proxy-secret' } } }) });
+  if (kind === 'incomplete') listeners.get('message')!({ data: JSON.stringify({ type: 'response.incomplete' }) });
+  await expect(promise).rejects.not.toThrow('proxy-secret');
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(remove).toHaveBeenCalledTimes(4);
+  expect(removeAbort).toHaveBeenCalledWith('abort', expect.any(Function));
  });
 });

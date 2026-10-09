@@ -1,5 +1,6 @@
 import { Type } from '@sinclair/typebox';
-import { SearchInput, search, resolveProviderConfig, localTime, type Config } from './core.js';
+import { SearchInput, search, localTime } from './core.js';
+import { resolveSearchConfig } from './config.js';
 
 export const WEB_SEARCH_INSTRUCTIONS = [
   'Use `web_search` when the answer depends on current, niche, factual, or externally verifiable information.',
@@ -19,11 +20,14 @@ export default function extension(pi: any) {
     }
   });
   pi.registerTool({
-    name: 'web_search', label: 'Web search', description: 'Search the web through CLIProxyAPI hosted search.', parameters: SearchInput,
+    name: 'web_search', label: 'Web search', description: 'Search the web through OpenAI, signed-in ChatGPT, or CLIProxyAPI hosted search.', parameters: SearchInput,
     async execute(_id: string, params: any, _signal: AbortSignal, _onUpdate: any, ctx: any) {
-      const config: Config | undefined = pi.getProvider?.('pi-cliproxyapi-provider')?.webSearchConfig?.() ?? pi.webSearchConfig?.() ?? await resolveProviderConfig(ctx?.model);
-      if (!config) return { content: [{ type: 'text', text: 'CLIProxyAPI web search is not configured.' }], details: { error: 'missing_config' } };
-      try { const result = await search(params, config, _signal); return { content: [{ type: 'text', text: result.text + (result.details.sources.length ? '\n\nSources:\n' + result.details.sources.map(s => `- ${s.title ?? s.url}: ${s.url}`).join('\n') : '') }], details: result.details }; }
+      try {
+        const config = await resolveSearchConfig(ctx ?? {}, pi);
+        if (!config) return { content: [{ type: 'text', text: 'Web search is not configured. Select an OpenAI model and use /login (ChatGPT sign-in or API key), or configure CLIProxyAPI.' }], details: { error: 'missing_config' }, isError: true };
+        const result = await search(params, config, _signal);
+        return { content: [{ type: 'text', text: result.text + (result.details.sources.length ? '\n\nSources:\n' + result.details.sources.map(s => `- ${s.title ?? s.url}: ${s.url}`).join('\n') : '') }], details: result.details };
+      }
       catch (e) { return { content: [{ type: 'text', text: e instanceof Error ? e.message : String(e) }], details: { error: 'web_search_failed' }, isError: true }; }
     }
   });
